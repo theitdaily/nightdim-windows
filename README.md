@@ -9,15 +9,15 @@
 ## Download and start (3 steps)
 
 1. Open the [latest GitHub release](../../releases/latest).
-2. Download the file named **`NightDim-v1.2.2-win.zip`** (or the ZIP for the latest version), then extract it.
-3. Double-click **`NightDim.exe`**. That's it — nothing to install.
+2. Under **Assets**, download **`NightDim.exe`** (not **Source code (zip)** or **Source code (tar.gz)**).
+3. Double-click the downloaded **`NightDim.exe`** to start NightDim. No extraction or installation is needed.
 
 Requires **Windows 10/11 and .NET Framework 4.x**. Most Windows 10/11 computers already have a compatible .NET Framework installed. If you are viewing source code instead of a release, see [Build from source](#build-from-source).
 
 ## Features
 
 - **Extra screen dimming (0–95%)** using a dark overlay, below Windows' usual minimum brightness.
-- **30-second safety confirmation** for changed settings. The confirmation opens about **0.7 seconds after you finish moving the slider**, not while dragging it. If you do not confirm, NightDim restores the previous settings automatically.
+- **30-second safety confirmation** only when a change makes the screen darker. The confirmation opens about **0.7 seconds after you finish moving the slider**, not while dragging it. If you do not confirm, NightDim restores the previous settings automatically.
 - **Automatic pause:** no dimming from **08:00 to 20:00** by default. Change those times or disable the schedule.
 - **Three interface languages:** English, Russian, and Serbian (Cyrillic). Language choice is saved automatically and does not need a dimming confirmation.
 - **System tray controls:** the app can hide near the Windows clock.
@@ -27,8 +27,8 @@ Requires **Windows 10/11 and .NET Framework 4.x**. Most Windows 10/11 computers 
 ## How to use it
 
 1. Use the **Language** menu at the top of the settings window to choose **English**, **Русский**, or **Српски (ћирилица)**. The selection is saved immediately.
-2. Drag the dimming slider and release it. About **0.7 seconds** later, the confirmation window appears. The 30-second safety countdown starts from your **last change**, so a long drag does not shorten your time to confirm.
-3. Click **Keep changes** within **30 seconds**, or click **Revert (Esc)** to undo it. If you do nothing, the previous dimming settings return automatically. The confirmation window intentionally stays bright so you can find it.
+2. Drag the dimming slider and release it. **If the screen gets darker**, the confirmation window appears after about **0.7 seconds**; the 30-second safety countdown runs from your **last change**. If the screen gets lighter or its visible brightness stays unchanged (for example, during a scheduled pause), no confirmation is needed.
+3. When prompted, click **Keep changes** within **30 seconds**, or click **Revert (Esc)** to undo the change. If you do nothing, the previous confirmed dimming settings return automatically. The confirmation window intentionally stays bright so you can find it.
 4. For the daytime break, tick **Pause dimming on a schedule** and choose start/end times (default **08:00–20:00**). Untick it for dimming all day.
 5. Close the settings window to hide NightDim in the tray. Use the tray icon to reopen settings or exit. The **Exit** button closes NightDim completely.
 
@@ -39,7 +39,7 @@ Requires **Windows 10/11 and .NET Framework 4.x**. Most Windows 10/11 computers 
 | Keys | Action |
 | --- | --- |
 | `Ctrl + Alt + ↓` | Make the screen 5% darker (confirmation required) |
-| `Ctrl + Alt + ↑` | Make the screen 5% lighter (confirmation required) |
+| `Ctrl + Alt + ↑` | Make the screen 5% lighter (no new confirmation required) |
 | `Ctrl + Alt + F12` | Disable dimming immediately for the current session |
 | `Esc` in the confirmation window | Discard the proposed change |
 
@@ -51,7 +51,7 @@ If the screen becomes too dark, use **`Ctrl + Alt + F12`**. If the hotkey is una
 - It cannot promise to darken *everything*: secure Windows dialogs (including UAC), the sign-in screen, exclusive fullscreen applications, HDR content, and protected video may behave differently.
 - **Mouse cursor dimming is experimental.** It uses graphics-card gamma control, which may conflict with HDR, Night light, ICC color profiles, or other color-management tools. If colors look wrong, turn cursor dimming off and exit NightDim normally so it can try to restore the previous gamma settings. Avoid forcibly killing the process.
 - The hotkeys may not work if another app has already registered them.
-- The `.exe` is currently **unsigned**. Windows SmartScreen or antivirus software may show a warning. Download only from this repository's Releases page and check files before running them.
+- The `.exe` is currently **unsigned**. Windows SmartScreen or antivirus software may show a warning. Download `NightDim.exe` only from this repository's Releases page and check files before running them.
 - NightDim does **not** start automatically with Windows.
 
 Confirmed settings are saved in `%APPDATA%\NightDim\settings.txt`. Delete that file while NightDim is closed to reset to defaults.
