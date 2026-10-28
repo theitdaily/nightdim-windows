@@ -9,7 +9,7 @@
 ## Download and start (3 steps)
 
 1. Open the [latest GitHub release](../../releases/latest).
-2. Download the file named **`NightDim-v1.2.0-win.zip`** (or the ZIP for the latest version), then extract it.
+2. Download the file named **`NightDim-v1.2.2-win.zip`** (or the ZIP for the latest version), then extract it.
 3. Double-click **`NightDim.exe`**. That's it — nothing to install.
 
 Requires **Windows 10/11 and .NET Framework 4.x**. Most Windows 10/11 computers already have a compatible .NET Framework installed. If you are viewing source code instead of a release, see [Build from source](#build-from-source).

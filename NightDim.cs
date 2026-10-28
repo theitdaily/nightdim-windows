@@ -81,13 +81,6 @@ namespace NightDim
             return (Settings)MemberwiseClone();
         }
 
-        internal bool SameAs(Settings other)
-        {
-            return Amount == other.Amount && Enabled == other.Enabled &&
-                UseSchedule == other.UseSchedule && PauseStart == other.PauseStart &&
-                PauseEnd == other.PauseEnd && TryDimCursor == other.TryDimCursor;
-        }
-
         internal bool IsPaused(DateTime now)
         {
             if (!UseSchedule) return false;
@@ -417,6 +410,8 @@ namespace NightDim
         private bool exiting;
         private bool firstShown;
         private bool emergencyOff;
+        // Keep the original emergency state while an unsafe preview is pending.
+        private bool previewEmergencyOff;
         private readonly bool firstLaunch;
         private ConfirmWindow confirmation;
         private DimOverlay[] overlays = new DimOverlay[0];
@@ -505,10 +500,10 @@ namespace NightDim
             pauseFrom = MakeTimePicker(78, 221, draft.PauseStart);
             toLabel = AddLabel("", 221, 228, 35, 27, 10F, FontStyle.Regular, Color.White);
             pauseTo = MakeTimePicker(262, 221, draft.PauseEnd);
-            pauseFrom.ValueChanged += delegate { if (!updatingControls)
-                UpdateDraft(delegate(Settings s) { s.PauseStart = ClockMinute(pauseFrom.Value); }); };
-            pauseTo.ValueChanged += delegate { if (!updatingControls)
-                UpdateDraft(delegate(Settings s) { s.PauseEnd = ClockMinute(pauseTo.Value); }); };
+            // The native time editor is still processing the keystroke here.
+            // Reading and rewriting the picker synchronously can invalidate it.
+            pauseFrom.ValueChanged += delegate { QueueScheduleChange(true); };
+            pauseTo.ValueChanged += delegate { QueueScheduleChange(false); };
 
             scheduleLabel = AddLabel("", 23, 268, 460, 37, 9F,
                 FontStyle.Regular, Color.FromArgb(176, 193, 214));
@@ -684,20 +679,75 @@ namespace NightDim
             else if (mode == PowerModes.Resume) RecreateDisplays();
         }
 
+        private void QueueScheduleChange(bool start)
+        {
+            if (updatingControls || exiting || IsDisposed || !IsHandleCreated) return;
+            // Wait until DateTimePicker has finished handling its native edit event.
+            BeginInvoke(new MethodInvoker(delegate
+            {
+                if (updatingControls || exiting || IsDisposed) return;
+                DateTimePicker picker = start ? pauseFrom : pauseTo;
+                if (picker.IsDisposed) return;
+                int minute;
+                try { minute = ClockMinute(picker.Value); }
+                catch (ObjectDisposedException) { return; }
+                if (minute == (start ? draft.PauseStart : draft.PauseEnd)) return;
+                // Do not write back to the picker the user is editing.
+                UpdateDraft(delegate(Settings settings)
+                {
+                    if (start) settings.PauseStart = minute;
+                    else settings.PauseEnd = minute;
+                }, false);
+            }));
+        }
+
+        private static int EffectiveAmount(Settings settings, bool emergencyDisabled)
+        {
+            return settings.Enabled && !settings.IsPaused(DateTime.Now) && !emergencyDisabled
+                ? settings.Amount : 0;
+        }
+
+        private void SaveWithoutConfirmation()
+        {
+            confirmed = draft.Copy();
+            confirmed.Write(settingsFile);
+            StopConfirmation();
+        }
+
         private void UpdateDraft(Action<Settings> change)
         {
+            UpdateDraft(change, true);
+        }
+
+        private void UpdateDraft(Action<Settings> change, bool syncControls)
+        {
             if (exiting) return;
+            bool wasEmergencyOff = emergencyOff;
+            int before = EffectiveAmount(draft, emergencyOff);
             change(draft);
             emergencyOff = false;
-            SyncControls();
+            if (syncControls) SyncControls();
+            int after = EffectiveAmount(draft, emergencyOff);
+            // Compare visible dimming with the last accepted state, not raw
+            // settings. During a schedule pause even 95% means 0% dimming.
+            bool alreadyPreviewing = previewClock.IsRunning;
+            int safeLevel = EffectiveAmount(confirmed,
+                alreadyPreviewing ? previewEmergencyOff : wasEmergencyOff);
             ApplyDim();
-            if (draft.SameAs(confirmed))
+
+            if (after <= safeLevel)
             {
-                StopConfirmation();
+                // Making the screen lighter (or leaving it unchanged) is safe
+                // and is saved immediately, without any confirmation window.
+                SaveWithoutConfirmation();
                 return;
             }
-            // Preview immediately but do not steal focus while the user is
-            // dragging. Restart the 30-second safety window on each change.
+
+            // A smaller value while a preview is pending must not silently
+            // approve a still-darker-than-confirmed screen. Keep its original
+            // deadline, but do not start a fresh confirmation for lightening.
+            if (alreadyPreviewing && after <= before) return;
+            if (!alreadyPreviewing) previewEmergencyOff = wasEmergencyOff;
             previewClock.Restart();
             popupDelay.Restart();
             DismissConfirmation();
@@ -761,8 +811,17 @@ namespace NightDim
             if (confirmation == null) return;
             ConfirmWindow old = confirmation;
             confirmation = null;
-            old.Dismiss();
-            old.Dispose();
+            // Do not destroy a dialog while its button/click event is executing.
+            // Hide it now, then dispose it on the next message-loop iteration.
+            old.Hide();
+            if (IsHandleCreated && !exiting && !Disposing && !IsDisposed)
+            {
+                BeginInvoke(new MethodInvoker(delegate
+                {
+                    if (!old.IsDisposed) { old.Dismiss(); old.Dispose(); }
+                }));
+            }
+            else { old.Dismiss(); old.Dispose(); }
         }
 
         private void SyncControls()
@@ -803,8 +862,10 @@ namespace NightDim
 
         private void RejectChanges()
         {
+            bool restoreEmergency = previewClock.IsRunning && previewEmergencyOff;
             StopConfirmation();
             draft = confirmed.Copy();
+            emergencyOff = restoreEmergency;
             SyncControls();
             ApplyDim();
         }
@@ -829,8 +890,7 @@ namespace NightDim
 
         private void ApplyDim()
         {
-            bool paused = draft.IsPaused(DateTime.Now);
-            int effective = draft.Enabled && !paused && !emergencyOff ? draft.Amount : 0;
+            int effective = EffectiveAmount(draft, emergencyOff);
             bool tryCursor = draft.TryDimCursor;
             // Reapply gamma only when needed, not on each timer tick.
             if (gamma != null && (effective != lastEffective || tryCursor != lastTryCursor))
@@ -880,6 +940,15 @@ namespace NightDim
             if (stopSignal.WaitOne(0)) { Quit(); return; }
             if (previewClock.IsRunning)
             {
+                // If a scheduled pause begins during an unsafe preview,
+                // cancel that preview rather than show an unnecessary dialog.
+                // Do not silently save unapproved darkness for later tonight.
+                if (EffectiveAmount(draft, emergencyOff) <=
+                    EffectiveAmount(confirmed, previewEmergencyOff))
+                {
+                    RejectChanges();
+                    return;
+                }
                 double seconds = TimeoutSeconds - previewClock.Elapsed.TotalSeconds;
                 if (seconds <= 0) { RejectChanges(); return; }
                 if (confirmation == null && !draggingSlider && popupDelay.IsRunning &&
@@ -889,8 +958,7 @@ namespace NightDim
             }
             // Time schedule changes take effect automatically, including when
             // the application is hidden in the system tray.
-            if (lastEffective != (draft.Enabled && !draft.IsPaused(DateTime.Now) && !emergencyOff ? draft.Amount : 0))
-                ApplyDim();
+            if (lastEffective != EffectiveAmount(draft, emergencyOff)) ApplyDim();
         }
 
         protected override void WndProc(ref Message m)
