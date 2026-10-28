@@ -1,0 +1,8 @@
+# Local build outputs
+NightDim.exe
+*.pdb
+*.tmp
+dist/
+.vs/
+*.user
+*.suo
