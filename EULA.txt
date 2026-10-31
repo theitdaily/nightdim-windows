@@ -1,0 +1,52 @@
+NIGHTDIM — END-USER NOTICE AND LICENSE AGREEMENT
+
+Publisher: TheITDaily / NightDim contributors
+
+NightDim is free and open-source software distributed under the MIT License.
+This notice describes practical risks and reproduces the complete MIT License.
+It does not revoke or narrow any permissions granted by that license.
+
+IMPORTANT INFORMATION
+
+1. NightDim changes how your display looks by applying a software overlay. An
+   optional experimental feature may alter the graphics-card gamma settings.
+   Screen content, the cursor, colors, or other applications may appear different.
+   Some Windows screens and protected content may not be dimmed.
+
+2. The software is not designed for safety-critical, medical, emergency, or
+   other situations where impaired screen visibility could cause harm.
+   You are responsible for deciding when and how to enable dimming.
+
+3. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
+   "AS IS", WITHOUT WARRANTIES. THE AUTHORS AND COPYRIGHT HOLDERS DISCLAIM
+   LIABILITY FOR CLAIMS, DAMAGES, OR OTHER LOSSES ARISING FROM USE OF THE
+   SOFTWARE, AS FURTHER SET OUT IN THE MIT LICENSE BELOW. NOTHING IN THIS
+   NOTICE EXCLUDES LIABILITY THAT CANNOT LAWFULLY BE EXCLUDED.
+
+4. By selecting "I have read and accept" in the installer, you acknowledge
+   this notice and the MIT License. If you do not accept, cancel installation.
+   The open-source rights granted by the MIT License remain unchanged.
+
+FULL MIT LICENSE (VERBATIM)
+
+MIT License
+
+Copyright (c) 2026 NightDim contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

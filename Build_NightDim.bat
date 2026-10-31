@@ -19,8 +19,16 @@ if not exist "NightDim.cs" (
     echo ERROR: NightDim.cs is missing.
     goto finish
 )
+if not exist "WindowsIntegration.cs" (
+    echo ERROR: WindowsIntegration.cs is missing.
+    goto finish
+)
 if not exist "UiText.cs" (
     echo ERROR: UiText.cs is missing.
+    goto finish
+)
+if not exist "ReleaseChecker.cs" (
+    echo ERROR: ReleaseChecker.cs is missing.
     goto finish
 )
 if not exist "AssemblyInfo.cs" (
@@ -35,7 +43,7 @@ if exist "%BUILD_OUTPUT%" (
 )
 
 echo Building NightDim.exe...
-"%CSC%" /nologo /target:winexe /optimize+ /platform:anycpu /codepage:65001 /out:"%BUILD_OUTPUT%" /win32icon:"%~dp0NightDim.ico" /reference:System.dll /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "NightDim.cs" "UiText.cs" "AssemblyInfo.cs"
+"%CSC%" /nologo /target:winexe /optimize+ /platform:anycpu /codepage:65001 /out:"%BUILD_OUTPUT%" /win32icon:"%~dp0NightDim.ico" /reference:System.dll /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "NightDim.cs" "UiText.cs" "ReleaseChecker.cs" "WindowsIntegration.cs" "AssemblyInfo.cs"
 if errorlevel 1 (
     echo ERROR: Compilation failed. Read the compiler errors above.
     goto finish

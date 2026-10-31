@@ -375,6 +375,7 @@ namespace NightDim
         private const int HotkeyEmergency = 103;
         private readonly string settingsFile;
         private readonly EventWaitHandle stopSignal;
+        private readonly bool startHidden;
         private readonly System.Windows.Forms.Timer clock;
         private readonly NotifyIcon tray;
         private readonly TrackBar slider;
@@ -390,8 +391,11 @@ namespace NightDim
         private readonly Button toggleButton;
         private readonly Button hideButton;
         private readonly Button exitButton;
+        private readonly Button updateButton;
         private readonly CheckBox scheduleCheck;
         private readonly CheckBox cursorCheck;
+        private readonly CheckBox startupCheck;
+        private readonly CheckBox startMenuCheck;
         private readonly DateTimePicker pauseFrom;
         private readonly DateTimePicker pauseTo;
         private readonly ToolStripMenuItem trayToggle;
@@ -409,6 +413,7 @@ namespace NightDim
         private bool draggingSlider;
         private bool exiting;
         private bool firstShown;
+        private bool checkingUpdates;
         private bool emergencyOff;
         // Keep the original emergency state while an unsafe preview is pending.
         private bool previewEmergencyOff;
@@ -420,9 +425,10 @@ namespace NightDim
         private int lastEffective = -1;
         private bool lastTryCursor;
 
-        internal ControlWindow(EventWaitHandle stopSignal)
+        internal ControlWindow(EventWaitHandle stopSignal, bool startHidden)
         {
             this.stopSignal = stopSignal;
+            this.startHidden = startHidden;
             settingsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "NightDim", "settings.txt");
             firstLaunch = !File.Exists(settingsFile);
@@ -434,8 +440,8 @@ namespace NightDim
 
             Text = "NightDim";
             Font = new Font("Segoe UI", 9F);
-            ClientSize = new Size(510, 472);
-            MinimumSize = new Size(526, 511);
+            ClientSize = new Size(510, 601);
+            MinimumSize = new Size(526, 640);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -517,14 +523,29 @@ namespace NightDim
                 UpdateDraft(delegate(Settings s) { s.TryDimCursor = cursorCheck.Checked; }); };
             Controls.Add(cursorCheck);
 
-            toggleButton = MakeButton("", 22, 362, 142, 40);
+            startupCheck = new CheckBox();
+            startupCheck.Location = new Point(23, 346);
+            startupCheck.Size = new Size(466, 26);
+            startupCheck.CheckedChanged += delegate { SetWindowsOption(startupCheck, true); };
+            Controls.Add(startupCheck);
+
+            startMenuCheck = new CheckBox();
+            startMenuCheck.Location = new Point(23, 378);
+            startMenuCheck.Size = new Size(466, 26);
+            startMenuCheck.CheckedChanged += delegate { SetWindowsOption(startMenuCheck, false); };
+            Controls.Add(startMenuCheck);
+
+            toggleButton = MakeButton("", 22, 430, 142, 40);
             toggleButton.Click += delegate { UpdateDraft(delegate(Settings s) { s.Enabled = !s.Enabled; }); };
-            hideButton = MakeButton("", 174, 362, 171, 40);
+            hideButton = MakeButton("", 174, 430, 171, 40);
             hideButton.Click += delegate { Hide(); };
-            exitButton = MakeButton("", 355, 362, 133, 40);
+            exitButton = MakeButton("", 355, 430, 133, 40);
             exitButton.Click += delegate { Quit(); };
 
-            statusLabel = AddLabel("", 23, 415, 463, 51, 8.5F,
+            updateButton = MakeButton("", 22, 484, 466, 35);
+            updateButton.Click += delegate { CheckForUpdates(); };
+
+            statusLabel = AddLabel("", 23, 538, 463, 54, 8.5F,
                 FontStyle.Regular, Color.FromArgb(168, 176, 190));
 
 
@@ -626,7 +647,9 @@ namespace NightDim
             registeredHotkeys[2] = Native.RegisterHotKey(Handle, HotkeyEmergency,
                 Native.MOD_CONTROL | Native.MOD_ALT, (uint)Keys.F12);
             ApplyLanguage();
+            SyncWindowsOptions();
             if (firstLaunch) UpdateDraft(delegate(Settings s) { /* Confirm initial 35%. */ });
+            if (startHidden && !firstLaunch) BeginInvoke(new MethodInvoker(Hide));
         }
 
         private void RecreateDisplays()
@@ -771,6 +794,90 @@ namespace NightDim
             ApplyLanguage();
         }
 
+        private void CheckForUpdates()
+        {
+            if (checkingUpdates || exiting) return;
+            checkingUpdates = true;
+            updateButton.Enabled = false;
+            updateButton.Text = UiText.Get(draft.Language, "CheckingUpdates");
+            // Never block the WinForms UI or download/run an installer silently.
+            ThreadPool.QueueUserWorkItem(delegate(object ignored)
+            {
+                Version version = null;
+                Exception failure = null;
+                try { version = ReleaseChecker.LatestVersion(); }
+                catch (Exception ex) { failure = ex; }
+                if (IsDisposed || !IsHandleCreated) return;
+                try
+                {
+                    BeginInvoke(new MethodInvoker(delegate
+                    {
+                        if (IsDisposed || exiting) return;
+                        checkingUpdates = false;
+                        updateButton.Enabled = true;
+                        updateButton.Text = UiText.Get(draft.Language, "CheckUpdates");
+                        string language = draft.Language;
+                        if (failure != null)
+                        {
+                            MessageBox.Show(this, UiText.Get(language, "UpdateFailed") + "\n" + failure.Message,
+                                "NightDim", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                        Version current = ReleaseChecker.CurrentVersion;
+                        Version normalizedCurrent = new Version(current.Major, current.Minor, Math.Max(0, current.Build));
+                        Version normalizedLatest = new Version(version.Major, version.Minor, Math.Max(0, version.Build));
+                        if (normalizedLatest.CompareTo(normalizedCurrent) <= 0)
+                        {
+                            MessageBox.Show(this, string.Format(UiText.Get(language, "UpToDate"),
+                                current.ToString(3)), "NightDim", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        DialogResult answer = MessageBox.Show(this,
+                            string.Format(UiText.Get(language, "UpdateAvailable"), version.ToString(3)),
+                            "NightDim", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        if (answer == DialogResult.Yes)
+                        {
+                            try { Process.Start(ReleaseChecker.ReleasesPage); }
+                            catch (Exception ex) { MessageBox.Show(this, ex.Message, "NightDim"); }
+                        }
+                    }));
+                }
+                catch (InvalidOperationException) { /* Window was closed. */ }
+            });
+        }
+
+        private void SyncWindowsOptions()
+        {
+            updatingControls = true;
+            try
+            {
+                startupCheck.Checked = WindowsIntegration.IsStartupEnabled(Application.ExecutablePath);
+                startMenuCheck.Checked = WindowsIntegration.IsStartMenuEnabled(Application.ExecutablePath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(UiText.Get(draft.Language, "WindowsOptionError") + ex.Message,
+                    "NightDim", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally { updatingControls = false; }
+        }
+
+        private void SetWindowsOption(CheckBox option, bool startup)
+        {
+            if (updatingControls || exiting) return;
+            try
+            {
+                if (startup) WindowsIntegration.SetStartup(Application.ExecutablePath, option.Checked);
+                else WindowsIntegration.SetStartMenu(Application.ExecutablePath, option.Checked);
+            }
+            catch (Exception ex)
+            {
+                SyncWindowsOptions();
+                MessageBox.Show(UiText.Get(draft.Language, "WindowsOptionError") + ex.Message,
+                    "NightDim", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
         private void ApplyLanguage()
         {
             string lang = draft.Language;
@@ -782,7 +889,10 @@ namespace NightDim
             fromLabel.Text = UiText.Get(lang, "From");
             toLabel.Text = UiText.Get(lang, "To");
             cursorCheck.Text = UiText.Get(lang, "CursorCheck");
+            startupCheck.Text = UiText.Get(lang, "StartupCheck");
+            startMenuCheck.Text = UiText.Get(lang, "StartMenuCheck");
             hideButton.Text = UiText.Get(lang, "Hide");
+            updateButton.Text = UiText.Get(lang, checkingUpdates ? "CheckingUpdates" : "CheckUpdates");
             exitButton.Text = UiText.Get(lang, "Exit");
             statusLabel.Text = UiText.Get(lang, firstShown && !registeredHotkeys[2] ? "HotkeyWarning" : "Hint");
             trayOpen.Text = UiText.Get(lang, "TrayOpen");
@@ -977,6 +1087,7 @@ namespace NightDim
         {
             if (IsDisposed) return;
             Show();
+            SyncWindowsOptions();
             WindowState = FormWindowState.Normal;
             BringToFront();
             Activate();
@@ -1065,7 +1176,8 @@ namespace NightDim
                         }
                         Application.EnableVisualStyles();
                         Application.SetCompatibleTextRenderingDefault(false);
-                        Application.Run(new ControlWindow(stopSignal));
+                        Application.Run(new ControlWindow(stopSignal,
+                            args.Length > 0 && args[0].Equals("--tray", StringComparison.OrdinalIgnoreCase)));
                     }
                     catch (Exception ex)
                     {
